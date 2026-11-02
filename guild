@@ -1,0 +1,17 @@
+#!/usr/bin/env python3
+"""Startet Guild aus dem Checkout, ohne Installation."""
+from __future__ import annotations
+
+import sys
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent / "src"))
+
+try:
+    from guild.cli import main
+except ModuleNotFoundError as exc:  # rich fehlt
+    sys.stderr.write(f"✗ {exc.name} fehlt — `pip install rich` oder `pip install -e .`\n")
+    raise SystemExit(3)
+
+if __name__ == "__main__":
+    raise SystemExit(main())

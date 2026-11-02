@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>{{ brief.kunde }}</h1>
+<p class="lead">{{ brief.produkt }} · {{ brief.zielgruppe }} · Sprache {{ brief.sprache }} · Ton: {{ brief.ton }}</p>
+
+<div class="karten">
+  <div class="karte"><div class="wert">{{ zustand.ergebnis.score if zustand.ergebnis else "—" }}</div><div class="label">Gate</div></div>
+  <div class="karte"><div class="wert">{{ zustand.ergebnis.kritisch if zustand.ergebnis else "—" }}</div><div class="label">kritisch</div></div>
+  <div class="karte"><div class="wert">{{ zustand.ergebnis.warnungen if zustand.ergebnis else "—" }}</div><div class="label">Warnungen</div></div>
+  <div class="karte"><div class="wert">{{ zustand.runden|length }}</div><div class="label">Runden</div></div>
+</div>
+
+<h2>Abgabe</h2>
+<p class="lead">{{ "möglich" if zustand.bereit else "noch nicht möglich" }} — {{ zustand.grund }}</p>
+<div class="zeile">
+  <form method="post" action="{{ url_for('run', slug=brief.slug) }}">
+    <button class="knopf" type="submit">Neu messen</button>
+  </form>
+  {% if zustand.runden %}
+  <a class="knopf primary" href="{{ url_for('preview', slug=brief.slug) }}" target="_blank">Vorschau {{ zustand.letzte }}</a>
+  {% endif %}
+</div>
+
+<h2>Runden</h2>
+{% if verlauf %}
+<table>
+  <thead><tr><th>Runde</th><th>Score</th><th>kritisch</th><th>Warnungen</th><th>Dateien</th><th>gemessen</th></tr></thead>
+  <tbody>
+  {% for r in verlauf %}
+    <tr class="{{ 'gruen' if r.bestanden else 'rot' }}">
+      <td class="num">{{ r.runde }}</td><td class="num">{{ r.score }}</td>
+      <td class="num">{{ r.kritisch }}</td><td class="num">{{ r.warnungen }}</td>
+      <td class="num">{{ r.dateien }}</td><td class="mono">{{ r.gemessen|datum }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="leer">Noch keine gemessene Runde.</div>
+{% endif %}
+
+<h2>Findings{% if zustand.ergebnis %} — {{ zustand.offen|length }}{% endif %}</h2>
+{% if zustand.offen %}
+<div class="findings">
+  {% for f in zustand.offen %}
+  <div class="finding {{ f.severity }}">
+    <div class="sev">{{ f.severity }}</div>
+    <div>
+      <div class="titel">{{ f.title }}</div>
+      <div class="detail">{{ f.detail }}</div>
+      <div class="ort">{{ f.area }}{% if f.file %} · {{ f.file }}{% endif %}</div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% else %}
+<div class="leer">Keine offenen Findings.</div>
+{% endif %}
+
+<h2>Was die Rollen liefern</h2>
+<table>
+  <thead><tr><th>Rolle</th><th>Auftrag</th><th>Ergebnis</th></tr></thead>
+  <tbody>
+  {% for r in rollen %}
+    <tr><td>{{ r.rolle }}</td><td>{{ r.aufgabe }}</td><td class="mono">{{ r.ergebnis }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<h2>Ereignisse</h2>
+<table>
+  <tbody>
+  {% for e in ereignisse %}
+    <tr><td class="mono">{{ e.at|datum }}</td><td>{{ e.text }}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

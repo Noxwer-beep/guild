@@ -1,0 +1,28 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "guild"
+version = "1.0.0"
+description = "Eine Design- und Entwicklungsfirma aus Rollen, Runden und einem Qualitätsgate"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+authors = [{ name = "Maximilian Jatzkowski" }]
+dependencies = ["rich>=13.7"]
+
+[project.optional-dependencies]
+ui = ["flask>=3.0"]
+
+[project.scripts]
+guild = "guild.cli:main"
+
+[tool.setuptools]
+package-dir = { "" = "src" }
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.package-data]
+guild = ["web/templates/*.html", "web/static/*"]

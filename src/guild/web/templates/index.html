@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>Aufträge</h1>
+<p class="lead">Jeder Auftrag beginnt als Briefing und verlässt das Haus erst, wenn eine
+Runde durch das Gate gekommen ist — mit Revision, nicht mit einem einzigen Wurf.</p>
+
+{% if auftraege %}
+<div class="liste">
+  {% for a in auftraege %}
+  <a class="auftrag" href="{{ url_for('job', slug=a.brief.slug) }}">
+    <div>
+      <div class="kunde">{{ a.brief.kunde }}</div>
+      <div class="produkt">{{ a.brief.produkt }}</div>
+      <div class="meta">{{ a.brief.slug }} · {{ a.zustand.runden|length }} Runden · {{ a.zustand.grund }}</div>
+    </div>
+    <span class="gate {{ a.gate }}">{{ a.gate }}</span>
+  </a>
+  {% endfor %}
+</div>
+{% else %}
+<div class="leer">Noch kein Briefing. <code>./guild new kunde-name --kunde … --produkt …</code></div>
+{% endif %}
+{% endblock %}

@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>{{ titel }} · Guild</title>
+  <meta name="description" content="Guild — Briefing, Runden, Kritik und ein Gate, das eine Abgabe aufhält, bis sie sauber ist.">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="{{ url_for('static', filename='app.css') }}">
+</head>
+<body>
+  <header class="kopf">
+    <span class="marke">GUILD</span>
+    <span class="unter">Briefing · Runden · Gate</span>
+    <nav>
+      <a href="{{ url_for('index') }}">Aufträge</a>
+      <a href="http://127.0.0.1:8800/api/jobs">API</a>
+    </nav>
+  </header>
+  <main>
+    {% block inhalt %}{% endblock %}
+    <footer>lokales Fenster auf den Kundenordner · keine Anmeldung · kein Dienst</footer>
+  </main>
+</body>
+</html>

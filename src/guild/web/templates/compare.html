@@ -1,0 +1,36 @@
+{% extends "base.html" %}
+{% block inhalt %}
+<h1>{{ diff.von }} → {{ diff.nach }}</h1>
+<p class="lead">{{ brief.kunde }} · Score {{ diff.score.von }} → {{ diff.score.nach }} ·
+kritisch {{ diff.kritisch.von }} → {{ diff.kritisch.nach }}</p>
+
+<h2>Dateien</h2>
+<table>
+  <tbody>
+    <tr><td>neu</td><td class="mono">{{ diff.dateien.hinzu|join(", ") or "—" }}</td></tr>
+    <tr><td>geändert</td><td class="mono">{{ diff.dateien.geaendert|join(", ") or "—" }}</td></tr>
+    <tr><td>entfernt</td><td class="mono">{{ diff.dateien.weg|join(", ") or "—" }}</td></tr>
+  </tbody>
+</table>
+
+<h2>Behoben — {{ diff.behoben|length }}</h2>
+{% if diff.behoben %}
+<div class="findings">
+  {% for f in diff.behoben %}
+  <div class="finding info"><div class="sev">behoben</div>
+    <div><div class="titel">{{ f.title }}</div><div class="ort">{{ f.area }}</div></div></div>
+  {% endfor %}
+</div>
+{% else %}<div class="leer">nichts</div>{% endif %}
+
+<h2>Neu — {{ diff.neu|length }}</h2>
+{% if diff.neu %}
+<div class="findings">
+  {% for f in diff.neu %}
+  <div class="finding {{ f.severity }}"><div class="sev">{{ f.severity }}</div>
+    <div><div class="titel">{{ f.title }}</div><div class="detail">{{ f.detail }}</div>
+    <div class="ort">{{ f.area }}{% if f.file %} · {{ f.file }}{% endif %}</div></div></div>
+  {% endfor %}
+</div>
+{% else %}<div class="leer">nichts</div>{% endif %}
+{% endblock %}
