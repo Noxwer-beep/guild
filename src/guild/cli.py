@@ -18,7 +18,7 @@ import argparse
 import sys
 from pathlib import Path
 
-from . import __version__, brief as brief_modul, config, engine, ui
+from . import __version__, agents, brief as brief_modul, config, engine, ui
 from .store import Store
 
 
@@ -77,6 +77,57 @@ def cmd_run(args: argparse.Namespace) -> int:
             f"{ergebnis.warnungen} Warnungen · {ergebnis.dateien} Dateien")
     ui.findings([f.as_dict() for f in ergebnis.findings])
     return 0 if ergebnis.bestanden else 3
+
+
+def cmd_build(args: argparse.Namespace) -> int:
+    """Eine oder mehrere Runden von Hermes-Agenten bauen lassen."""
+    try:
+        brief = brief_modul.load_slug(args.slug)
+    except brief_modul.BriefError as exc:
+        ui.fail(str(exc))
+        return 2
+    if not agents.verfuegbar():
+        ui.fail("hermes nicht im PATH — ohne Agent kann nichts gebaut werden")
+        return 3
+
+    store = Store()
+    ui.head(f"{brief.slug} — Agenten bauen lassen",
+            f"bis {args.runden} Runden · Modell {args.modell or 'Standard'} · "
+            f"Zeitbudget {args.budget}s je Lauf")
+
+    def protokoll(run, ergebnis) -> None:
+        store.save_run(brief.slug, run)
+        # Ein gekappter Lauf (Züge oder Zeit) kann trotzdem abgeben — dann nicht "✗".
+        marke = "✓" if run.ok else ("⚑" if ergebnis else "✗")
+        ui.console.print(
+            f"  {marke} {run.rolle:<7} {run.runde:<4} {run.dauer_ms / 1000:5.1f}s  "
+            f"{run.tokens / 1000:>6.0f}k Tokens", end="")
+        if ergebnis:
+            farbe = "green" if ergebnis.bestanden else "red"
+            zusatz = "" if run.ok else " · gekappt"
+            ui.console.print(f"  · Gate [{farbe}]{ergebnis.score}/100[/] "
+                             f"({ergebnis.kritisch} kritisch){zusatz}")
+            ui.findings([f.as_dict() for f in ergebnis.findings], limit=6)
+        else:
+            ui.console.print(f"  · [red]{run.fehler or 'kein Ergebnis'}[/]")
+
+    laeufe = agents.automatik(brief, args.runden, args.modell or None,
+                              args.budget, protokoll)
+    if not laeufe:
+        ui.fail("kein Lauf ausgeführt")
+        return 1
+
+    gesamt = sum(r.tokens for r in laeufe)
+    ui.console.print()
+    ui.ok(f"{len(laeufe)} Lauf/Läufe · {gesamt / 1000:.0f}k Tokens · "
+          f"{sum(r.dauer_ms for r in laeufe) / 1000:.0f}s")
+
+    zustand = engine.stand(brief, store)
+    if zustand.bereit:
+        ui.hint("Gate grün — `guild ship " + brief.slug + "` gibt frei")
+        return 0
+    ui.hint(f"nicht bereit: {zustand.grund}")
+    return 3
 
 
 def cmd_show(args: argparse.Namespace) -> int:
@@ -200,6 +251,13 @@ def build_parser() -> argparse.ArgumentParser:
     run.add_argument("slug")
     run.add_argument("runde", nargs="?")
     run.set_defaults(func=cmd_run)
+
+    build = sub.add_parser("build", help="Runden von Hermes-Agenten bauen lassen")
+    build.add_argument("slug")
+    build.add_argument("--runden", type=int, default=config.MIN_ROUNDS + 1)
+    build.add_argument("--modell", default="")
+    build.add_argument("--budget", type=int, default=900)
+    build.set_defaults(func=cmd_build)
 
     show = sub.add_parser("show", help="Stand eines Auftrags")
     show.add_argument("slug")

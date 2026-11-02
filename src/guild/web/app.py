@@ -59,6 +59,8 @@ def create_app() -> Flask:
         zustand = engine.stand(brief, store)
         return render_template("job.html", brief=brief, zustand=zustand,
                                verlauf=store.rounds(slug),
+                               laeufe=store.runs(slug, limit=12),
+                               tokens=store.tokens(slug),
                                ereignisse=store.events(slug, limit=12),
                                rollen=engine.rollenplan(brief),
                                titel=brief.kunde)

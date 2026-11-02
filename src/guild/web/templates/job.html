@@ -67,6 +67,26 @@
   </tbody>
 </table>
 
+<h2>Agentenläufe{% if tokens %} — {{ (tokens / 1000)|round|int }}k Tokens{% endif %}</h2>
+{% if laeufe %}
+<table>
+  <thead><tr><th>Rolle</th><th>Runde</th><th>ok</th><th>Dauer</th><th>Tokens</th><th>Zeit</th></tr></thead>
+  <tbody>
+  {% for r in laeufe %}
+    <tr>
+      <td>{{ r.rolle }}</td><td class="num">{{ r.runde }}</td>
+      <td class="num">{{ "ja" if r.ok else "gekappt" }}</td>
+      <td class="num">{{ (r.dauer_ms / 1000)|round(1) }}s</td>
+      <td class="num">{{ ((r.tokens_in + r.tokens_out) / 1000)|round|int }}k</td>
+      <td class="mono">{{ r.at|datum }}</td>
+    </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<div class="leer">Noch kein Agentenlauf — <code>./guild build {{ brief.slug }}</code></div>
+{% endif %}
+
 <h2>Ereignisse</h2>
 <table>
   <tbody>

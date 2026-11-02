@@ -35,6 +35,7 @@ guild run <slug> [runde]    Runde durch das Gate schicken
 guild show <slug>           Stand, Findings, Verlauf
 guild compare <slug> v1 v2  zwei Runden vergleichen
 guild ship <slug>           abgeben (nur bei grünem Gate)
+guild build <slug>          Runden von Hermes-Agenten bauen lassen
 guild plan <slug>           was welche Rolle liefert
 guild web                   Studio im Browser (127.0.0.1:8800)
 ```
@@ -85,6 +86,38 @@ Was gemessen wird, und warum es kritisch ist:
 Der Score ist `100 − Summe der Gewichte` (kritisch 12, Warnung 3, Hinweis 1). Abgabe nur bei
 0 kritischen Findings **und** mindestens zwei Runden — eine Zahl ohne Revision ist keine
 Arbeit, sondern ein Entwurf.
+
+## Echte Agenten
+
+`guild build <slug>` baut die Runde nicht nach Rezept, sondern lässt einen Hermes-Agenten
+arbeiten:
+
+```bash
+./guild build tischlerei-brandt --runden 2 --budget 420
+  ⚑ bau  v1  272.6s  1605k Tokens · Gate 99/100 (0 kritisch)
+  ⚑ bau  v2  339.8s  2039k Tokens · Gate 100/100 (0 kritisch)
+✓ Gate grün — `guild ship tischlerei-brandt` gibt frei
+```
+
+Der Agent läuft mit `hermes chat --oneshot --in <rundenordner> --max-turns 30`; sein
+Arbeitsordner ist die Runde selbst. Er bekommt das Briefing, die Regeln des Gates und bei
+Revisionen die Findings der Vorrunde im Klartext. Er schreibt die Dateien mit seinen
+eigenen Werkzeugen — HTML, CSS, SVG, Notiz.
+
+**Was es kostet.** Ein Lauf mit 30 Zügen liegt bei 1,6–2,0 Mio Eingabe-Tokens. Das ist
+nicht die Länge der Seite, sondern der Verlauf: bei jedem Zug sieht das Modell die
+bisherigen Schritte erneut, der größte Teil davon sind Cache-Wiederholungen. Zwei Runden
+für einen Einseiter sind also ein paar Cent bis in den niedrigen Cent-Bereich, je nach
+Modell und Anbieter. `guild show <slug>` und das Studio zeigen die Summe pro Auftrag.
+
+**Was es nicht ist.** Kein Autopilot, der ohne dich Kunden anschreibt: `guild build` startet
+nur auf deinen Aufruf, ein Lauf ist auf Züge und Zeit begrenzt, und ohne grünes Gate gibt es
+keine Abgabe. Ein gekappter Lauf (⚑) ist kein Fehler — wenn dabei eine abgabefähige Runde
+entstanden ist, wird sie gemessen und darf weiter.
+
+**Der Unterschied zum Gate.** Der Agent gestaltet, das Gate urteilt. Beim ersten echten Lauf
+lag v1 bei 99/100 und das einzige Finding war die fehlende Notiz — die Seite war gut, die
+Buchführung fehlte. Genau dafür ist die Trennung da.
 
 ## Rollen
 

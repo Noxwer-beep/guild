@@ -35,6 +35,20 @@ CREATE TABLE IF NOT EXISTS rounds (
     qa          TEXT NOT NULL,
     PRIMARY KEY (slug, runde)
 );
+CREATE TABLE IF NOT EXISTS agent_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    slug        TEXT NOT NULL,
+    rolle       TEXT NOT NULL,
+    runde       TEXT NOT NULL,
+    ok          INTEGER NOT NULL,
+    tokens_in   INTEGER NOT NULL,
+    tokens_out  INTEGER NOT NULL,
+    dauer_ms    INTEGER NOT NULL,
+    exit_code   INTEGER NOT NULL,
+    text        TEXT NOT NULL,
+    fehler      TEXT NOT NULL,
+    at          TEXT NOT NULL
+);
 CREATE TABLE IF NOT EXISTS events (
     id          INTEGER PRIMARY KEY AUTOINCREMENT,
     at          TEXT NOT NULL,
@@ -120,6 +134,25 @@ class Store:
     def log(self, slug: str, level: str, text: str) -> None:
         self._write("INSERT INTO events (at, slug, level, text) VALUES (?,?,?,?)",
                     (jetzt(), slug, level, text))
+
+    # ---------------------------------------------------------------- agenten
+
+    def save_run(self, slug: str, run) -> None:
+        self._write(
+            "INSERT INTO agent_runs (slug, rolle, runde, ok, tokens_in, tokens_out, "
+            "dauer_ms, exit_code, text, fehler, at) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
+            (slug, run.rolle, run.runde, int(run.ok), run.tokens_in, run.tokens_out,
+             run.dauer_ms, run.exit_code, run.text[:2000], run.fehler[:2000], jetzt()))
+
+    def runs(self, slug: str, limit: int = 20) -> list[dict]:
+        return self._rows("SELECT * FROM agent_runs WHERE slug=? ORDER BY id DESC LIMIT ?",
+                          (slug, limit))
+
+    def tokens(self, slug: str) -> int:
+        reihen = self._rows(
+            "SELECT COALESCE(SUM(tokens_in + tokens_out), 0) AS n FROM agent_runs WHERE slug=?",
+            (slug,))
+        return int(reihen[0]["n"]) if reihen else 0
 
     def events(self, slug: str | None = None, limit: int = 30) -> list[dict]:
         if slug:
