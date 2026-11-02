@@ -26,7 +26,7 @@ SEITE = """<!doctype html>
 <body>
   <h1>Eine Überschrift, die trägt</h1>
   <p>Text mit einem <a href="kontakt.html">Link</a> und einem Bild.</p>
-  <img src="bild.jpg" alt="{alt}">
+  <img src="bild.png" alt="{alt}">
   <h2>Zweite Ebene</h2>
   <p>Noch ein Absatz.</p>
 </body>
@@ -41,6 +41,28 @@ STANDARD = dict(
 )
 
 
+def _bild(pfad: Path) -> None:
+    """Ein echtes PNG, nur mit stdlib erzeugt — das Gate prüft Existenz und Gewicht."""
+    import random
+    import struct
+    import zlib
+
+    breite, hoehe = 240, 160
+    rnd = random.Random(7)
+    roh = b"".join(b"\x00" + bytes(rnd.getrandbits(8) for _ in range(breite * 3))
+                   for _ in range(hoehe))
+
+    def chunk(art: bytes, daten: bytes) -> bytes:
+        return (struct.pack(">I", len(daten)) + art + daten +
+                struct.pack(">I", zlib.crc32(art + daten) & 0xFFFFFFFF))
+
+    png = (b"\x89PNG\r\n\x1a\n"
+           + chunk(b"IHDR", struct.pack(">IIBBBBB", breite, hoehe, 8, 2, 0, 0, 0))
+           + chunk(b"IDAT", zlib.compress(roh, 6))
+           + chunk(b"IEND", b""))
+    pfad.write_bytes(png)
+
+
 def baue(wurzel: Path, **abweichungen) -> Path:
     """Eine vollständige, regelkonforme Runde anlegen."""
     werte = {**STANDARD, **abweichungen}
@@ -50,5 +72,6 @@ def baue(wurzel: Path, **abweichungen) -> Path:
         SEITE.format(**{**werte, "titel": "Kontakt — Nordlicht Coaching"})
         .replace('href="kontakt.html"', 'href="index.html"'))
     (wurzel / "style.css").write_text(TOKENS)
+    _bild(wurzel / "bild.png")
     (wurzel / "notiz.md").write_text("# Notiz\n\nAufbau und Entscheidungen.\n")
     return wurzel

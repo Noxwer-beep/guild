@@ -29,6 +29,9 @@ CONTRAST_LARGE = 3.0
 #: Höchstens so viele externe Abhängigkeiten (Schriften, Skripte, CDNs).
 MAX_EXTERNAL = 3
 
+#: Ein einzelnes Bild darf so viel wiegen, bevor es die Seite ausbremst.
+MAX_BILD = 400_000
+
 
 @dataclass(frozen=True)
 class Rolle:

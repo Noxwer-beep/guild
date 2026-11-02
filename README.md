@@ -81,6 +81,7 @@ Was gemessen wird, und warum es kritisch ist:
 | Meta-Beschreibung | Warnung | Vorschauen und Suche raten sonst |
 | ≤ 3 externe Abhängigkeiten | Warnung | jede ist ein Fremdausfall |
 | Größenbudget (HTML 140 KB, CSS 45 KB) | Warnung | Gewicht ist eine Designentscheidung |
+| jedes `<img>` existiert und wiegt < 400 KB | kritisch / Warnung | ein fehlendes Bild ist ein leerer Kasten; 2 MB pro Foto bremsen die Seite |
 | keine Platzhalter (`[ … ]`, TODO, Lorem, Musterstraße) | kritisch | ein Kundendatum, das fehlt, gehört ins Briefing — nicht als Klammer auf die Seite |
 | Notiz zur Runde | Hinweis | warum so und nicht anders |
 

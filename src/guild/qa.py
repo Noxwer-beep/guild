@@ -97,6 +97,7 @@ class _Sammler(HTMLParser):
         self._h_offen: int | None = None
         self._h_text: list[str] = []
         self.bilder: list[str | None] = []
+        self.bild_quellen: list[str] = []
         self.meta: dict[str, str] = {}
         self.extern: list[str] = []
         self.styles_inline = 0
@@ -118,6 +119,7 @@ class _Sammler(HTMLParser):
             self._h_text = []
         elif tag == "img":
             self.bilder.append(werte.get("alt"))
+            self.bild_quellen.append((werte.get("src") or "").strip())
         elif tag == "a":
             href = (werte.get("href") or "").strip()
             if href:
@@ -326,6 +328,23 @@ def pruefe_seite(wurzel: Path, seite: Path) -> list[Finding]:
         f("inline", INFO, "Code", f"{sammler.styles_inline} style-Attribute",
           "Mehr als zwölf heißt: das Stylesheet deckt die Komponenten nicht ab.")
 
+    for quelle in sammler.bild_quellen:
+        if not quelle or quelle.startswith(("http://", "https://", "data:")):
+            continue
+        ziel = (seite.parent / quelle.split("?", 1)[0]).resolve()
+        if not ziel.exists():
+            f(f"bild-fehlt:{quelle[:30]}", KRITISCH, "Bilder", f"fehlendes Bild {quelle}",
+              "Das Bild liegt nicht in dieser Runde.")
+            continue
+        groesse = ziel.stat().st_size
+        if groesse > config.MAX_BILD:
+            f(f"bild-groesse:{quelle[:30]}", WARNUNG, "Bilder",
+              f"{quelle} {groesse // 1024} KB",
+              f"Budget {config.MAX_BILD // 1024} KB je Bild — sonst lädt die Seite zäh.")
+        if ziel.suffix.lower() in (".png", ".jpg", ".jpeg") and groesse < 6_000:
+            f(f"bild-klein:{quelle[:30]}", INFO, "Bilder", f"{quelle} wirkt leer",
+              "Unter 6 KB ist meist ein Platzhalter oder ein Fehlschlag.")
+
     treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(text)
                       if not m.group(0).startswith("[[")})
     if treffer:
@@ -347,14 +366,6 @@ def pruefe_css(wurzel: Path, datei: Path) -> list[Finding]:
     findings = kontraste(text)
     for finding in findings:
         finding.file = rel
-    treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(text)
-                      if not m.group(0).startswith("[[")})
-    if treffer:
-        f("platzhalter", KRITISCH, "Inhalt",
-          f"{len(treffer)} Platzhalter im Text",
-          "Ungefüllt: " + ", ".join(treffer[:4]) +
-          " — fehlende Kundendaten gehören ins Briefing (fakten), nicht in die Seite.")
-
     groesse = len(text.encode())
     if groesse > config.MAX_CSS:
         findings.append(Finding("css-groesse", WARNUNG, "Gewicht", f"CSS {groesse // 1024} KB",

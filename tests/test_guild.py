@@ -142,6 +142,15 @@ class Gate(Basis):
         self.assertFalse(ergebnis.bestanden)
         self.assertIn("platzhalter", [f.key for f in ergebnis.findings])
 
+    def test_fehlendes_bild_ist_kritisch(self) -> None:
+        self.brief()
+        wurzel = fixtures.baue(config.CLIENTS / "nordlicht" / "runden" / "v1")
+        seite = wurzel / "index.html"
+        seite.write_text(seite.read_text().replace('src="bild.png"', 'src="fehlt.png"'))
+        ergebnis = qa.pruefe_runde(wurzel, "v1")
+        self.assertFalse(ergebnis.bestanden)
+        self.assertTrue(any(f.key.startswith("bild-fehlt") for f in ergebnis.findings))
+
     def test_leere_runde_ist_ein_fehler(self) -> None:
         self.brief()
         leer = config.CLIENTS / "nordlicht" / "runden" / "v1"
