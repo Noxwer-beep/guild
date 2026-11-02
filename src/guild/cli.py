@@ -93,7 +93,8 @@ def cmd_build(args: argparse.Namespace) -> int:
     store = Store()
     ui.head(f"{brief.slug} — Agenten bauen lassen",
             f"bis {args.runden} Runden · Modell {args.modell or 'Standard'} · "
-            f"Zeitbudget {args.budget}s je Lauf")
+            f"Zeitbudget {args.budget}s je Lauf · "
+            f"{'Rollen nacheinander' if args.klassisch else 'Strategie → Art ∥ Text → Bau'}")
 
     def protokoll(run, ergebnis) -> None:
         store.save_run(brief.slug, run)
@@ -108,11 +109,13 @@ def cmd_build(args: argparse.Namespace) -> int:
             ui.console.print(f"  · Gate [{farbe}]{ergebnis.score}/100[/] "
                              f"({ergebnis.kritisch} kritisch){zusatz}")
             ui.findings([f.as_dict() for f in ergebnis.findings], limit=6)
+        elif run.ok:
+            ui.console.print("  · [dim]Beitrag geliefert[/]")
         else:
             ui.console.print(f"  · [red]{run.fehler or 'kein Ergebnis'}[/]")
 
     laeufe = agents.automatik(brief, args.runden, args.modell or None,
-                              args.budget, protokoll)
+                              args.budget, protokoll, rollen=not args.klassisch)
     if not laeufe:
         ui.fail("kein Lauf ausgeführt")
         return 1
@@ -257,6 +260,8 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--runden", type=int, default=config.MIN_ROUNDS + 1)
     build.add_argument("--modell", default="")
     build.add_argument("--budget", type=int, default=900)
+    build.add_argument("--klassisch", action="store_true",
+                       help="alle Rollen in einem Durchgang statt parallel")
     build.set_defaults(func=cmd_build)
 
     show = sub.add_parser("show", help="Stand eines Auftrags")

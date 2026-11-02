@@ -132,6 +132,16 @@ class Gate(Basis):
         ergebnis = qa.pruefe_runde(wurzel, "v1")
         self.assertTrue(any(f.key.startswith("heading-sprung") for f in ergebnis.findings))
 
+    def test_platzhalter_im_text_sind_kritisch(self) -> None:
+        self.brief()
+        wurzel = fixtures.baue(config.CLIENTS / "nordlicht" / "runden" / "v1")
+        seite = wurzel / "index.html"
+        seite.write_text(seite.read_text().replace(
+            "<p>Noch ein Absatz.</p>", "<p>Öffnungszeiten: [bitte ergänzen]</p>"))
+        ergebnis = qa.pruefe_runde(wurzel, "v1")
+        self.assertFalse(ergebnis.bestanden)
+        self.assertIn("platzhalter", [f.key for f in ergebnis.findings])
+
     def test_leere_runde_ist_ein_fehler(self) -> None:
         self.brief()
         leer = config.CLIENTS / "nordlicht" / "runden" / "v1"

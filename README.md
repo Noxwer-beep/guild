@@ -81,6 +81,7 @@ Was gemessen wird, und warum es kritisch ist:
 | Meta-Beschreibung | Warnung | Vorschauen und Suche raten sonst |
 | ≤ 3 externe Abhängigkeiten | Warnung | jede ist ein Fremdausfall |
 | Größenbudget (HTML 140 KB, CSS 45 KB) | Warnung | Gewicht ist eine Designentscheidung |
+| keine Platzhalter (`[ … ]`, TODO, Lorem, Musterstraße) | kritisch | ein Kundendatum, das fehlt, gehört ins Briefing — nicht als Klammer auf die Seite |
 | Notiz zur Runde | Hinweis | warum so und nicht anders |
 
 Der Score ist `100 − Summe der Gewichte` (kritisch 12, Warnung 3, Hinweis 1). Abgabe nur bei
@@ -98,6 +99,19 @@ arbeiten:
   ⚑ bau  v2  339.8s  2039k Tokens · Gate 100/100 (0 kritisch)
 ✓ Gate grün — `guild ship tischlerei-brandt` gibt frei
 ```
+
+Die erste Runde läuft in Rollen, nicht in einem Durchgang:
+
+```
+Strategie  →  Art Direction  ∥  Text  →  Bau
+  32 s          69 s / 78 s parallel     204 s
+```
+
+Strategie schreibt `konzept.md` (Angebot, Zielgruppe, Abschnittsstruktur, Tonalität), dann
+arbeiten Art Direction (`design/tokens.css` + `artdirection.md`) und Text (`inhalte.md`)
+**gleichzeitig** — sie hängen nur von der Struktur ab, nicht voneinander. Erst danach baut
+der vierte Agent aus diesen drei Ergebnissen. Revisionen laufen als ein Durchgang mit den
+Findings der Vorrunde; Rollen werden nur beim ersten Aufbau eines Auftrags gestartet.
 
 Der Agent läuft mit `hermes chat --oneshot --in <rundenordner> --max-turns 30`; sein
 Arbeitsordner ist die Runde selbst. Er bekommt das Briefing, die Regeln des Gates und bei
@@ -136,6 +150,23 @@ Buchführung fehlte. Genau dafür ist die Trennung da.
 Die Rollen sind keine Sprachmodell-Aufrufe im Code — das Gate ist deterministisch, die
 kreative Arbeit macht, wer sie macht: ein Agent oder ein Mensch. Guild hält den Prozess
 zusammen, nicht die Ideen.
+
+## Fakten gehören ins Briefing
+
+Ein Briefing kann `fakten` tragen — Adresse, Öffnungszeiten, Telefon, Preise, Termine:
+
+```toml
+fakten = [
+  "Adresse: Feldweg 3, 79112 Freiburg-Tiengen",
+  "Selbstbedienung rund um die Uhr",
+  "Theke: Freitag 15–18 Uhr",
+]
+```
+
+Sie gehen verbindlich in jeden Prompt, und der Agent darf nichts davon erfinden. Fehlt eine
+Angabe, wird sie weggelassen — nicht als `[bitte ergänzen]` stehen gelassen. Genau dieser
+Fall ist beim ersten Durchlauf passiert: die Seite war mit 99/100 durch, obwohl 39
+Platzhalter drinstanden. Seitdem ist das ein kritischer Fehler.
 
 ## Wo die Arbeit liegt
 

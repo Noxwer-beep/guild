@@ -63,6 +63,85 @@ def verfuegbar() -> bool:
 
 # ---------------------------------------------------------------- Prompting
 
+GATE_REGELN = """  1. Statisches HTML und CSS. Kein Framework, kein Build-Schritt, kein JavaScript nötig.
+  2. Jede Seite: <title> (20–70 Zeichen), <meta name="description"> (50–165), genau ein <h1>,
+     keine Sprünge in der Überschriftenhierarchie, <html lang="de">, viewport-Meta.
+  3. Jedes <img> mit sinnvollem alt; Dekoration mit alt="".
+  4. Keine toten internen Links: jede verlinkte Datei muss existieren.
+  5. Farben als CSS-Variablen. Text auf Fläche mindestens 4.5:1 Kontrast, Akzentfarbe
+     mindestens 3:1 — nachrechnen, nicht schätzen.
+  6. Höchstens drei externe Abhängigkeiten, besser keine.
+  7. HTML unter 140 KB, CSS unter 45 KB."""
+
+
+def _briefkopf(brief: brief_modul.Brief) -> str:
+    seiten = "\n".join(f"  - {s}" for s in brief.seiten)
+    ziele = "\n".join(f"  - {z}" for z in brief.ziele)
+    einschraenkungen = "\n".join(f"  - {e}" for e in brief.einschraenkungen) or "  - keine"
+    fakten = "\n".join(f"  - {f}" for f in brief.fakten) or "  - keine"
+    return (f"  Kunde:       {brief.kunde}\n"
+            f"  Produkt:     {brief.produkt}\n"
+            f"  Zielgruppe:  {brief.zielgruppe}\n"
+            f"  Ton:         {brief.ton}\n"
+            f"  Sprache:     {brief.sprache}\n"
+            f"  Ziele:\n{ziele}\n"
+            f"  Seiten:\n{seiten}\n"
+            f"  Einschränkungen:\n{einschraenkungen}\n"
+            f"  Fakten (verbindlich, nichts davon erfinden):\n{fakten}")
+
+
+def rollenprompt(brief: brief_modul.Brief, rolle: str) -> str:
+    """Der Auftrag an eine Vorbau-Rolle: Strategie, Art Direction oder Text."""
+    kopf = _briefkopf(brief)
+    if rolle == "strategie":
+        return f"""Du bist die Strategie-Rolle eines Designstudios. Auftrag:
+
+{kopf}
+
+Lies das Briefing und schreibe `konzept.md` (höchstens eine Seite):
+  1. Angebot in einem Satz — was der Kunde wirklich verkauft.
+  2. Zielgruppe: wer entscheidet, wer bezahlt, was sie vorher wissen wollen.
+  3. Seitenstruktur: nummerierte Abschnitte in Reihenfolge, je ein Satz Zweck.
+  4. Tonalität: drei Adjektive, ein Beispielsatz.
+  5. Was NICHT auf die Seite gehört (Behauptungen, die niemand belegen kann).
+
+Schreibe keine anderen Dateien. {ABSCHLUSS}"""
+
+    if rolle == "art":
+        return f"""Du bist die Art-Direction-Rolle eines Designstudios. Auftrag:
+
+{kopf}
+
+Lies `konzept.md`. Dann zwei Dateien:
+
+  a) `design/tokens.css` — nur CSS-Variablen in `:root`:
+     --bg, --surface, --fg, --muted, --accent, --line,
+     --size-1 … --size-5 (Typo-Skala), --space-1 … --space-6, --radius.
+     Kontrast verbindlich: --fg auf --bg mindestens 7:1, --muted auf --bg mindestens 4.5:1,
+     --accent auf --bg mindestens 3:1. Rechne die Werte nach, bevor du sie einsetzt.
+  b) `design/artdirection.md` — Schriftwahl und warum, Raster, Abstände, drei Regeln, die
+     der Bau einhalten muss, und was du bewusst weglässt.
+
+Keine Seite bauen. {ABSCHLUSS}"""
+
+    if rolle == "text":
+        return f"""Du bist die Text-Rolle eines Designstudios. Auftrag:
+
+{kopf}
+
+Lies `konzept.md` und schreibe `inhalte.md`:
+  - `<title>` und `<meta name="description">` (Längen beachten: 20–70 / 50–165 Zeichen)
+  - H1 und je Abschnitt der Struktur: Überschrift und Text, 2–4 Sätze
+  - ein Call-to-Action mit genauem Wortlaut und Ziel
+  - Fußzeile mit Kontaktweg
+
+Deutsch, in der Stimme des Kunden. Keine Floskeln („innovativ", „maßgeschneidert",
+„Leidenschaft"), keine erfundenen Zahlen, Referenzen oder Preise. Keine Seite bauen.
+{ABSCHLUSS}"""
+
+    raise ValueError(f"unbekannte Rolle: {rolle}")
+
+
 def bauprompt(brief: brief_modul.Brief, runde: str, findings: list[dict] | None = None) -> str:
     """Der Auftrag an den Agenten — Briefing, Regeln des Gates, Abgabedateien."""
     seiten = "\n".join(f"  - {s}" for s in brief.seiten)
@@ -105,7 +184,10 @@ REGELN (ein Gate prüft sie anschließend, maschinell)
      Akzentfarbe mindestens 3:1 — nachrechnen, nicht schätzen.
   6. Höchstens drei externe Abhängigkeiten, besser keine.
   7. HTML unter 140 KB, CSS unter 45 KB.
-  8. Lege ZUERST NOTIZ.md an (fünf Zeilen: was du baust und warum) und ergänze sie am
+  8. Keine Platzhalter. Keine eckigen Klammern, kein „TODO", keine Musteradresse.
+     Fehlt eine Angabe, formuliere ohne sie oder lass den Abschnitt weg — erfunden wird
+     nichts: keine Adresse, keine Öffnungszeit, kein Preis, keine Referenz.
+  9. Lege ZUERST NOTIZ.md an (fünf Zeilen: was du baust und warum) und ergänze sie am
      Ende. Ein Lauf kann gekappt werden; die Notiz gehört dann trotzdem dazu.
 
 QUALITÄT
@@ -206,6 +288,68 @@ def lauf(prompt: str, cwd: Path, rolle: str, runde: str,
         prompt_datei.unlink(missing_ok=True)
 
 
+# ---------------------------------------------------------------- Rollen
+
+VORBAU = ("strategie", "art", "text")
+
+
+def rolle_ausfuehren(brief: brief_modul.Brief, rolle: str, runde: str,
+                     modell: str | None = None, max_turns: int = 14,
+                     budget: int = 420) -> AgentRun:
+    pfad = brief_modul.runde_pfad(brief, runde)
+    pfad.mkdir(parents=True, exist_ok=True)
+    return lauf(rollenprompt(brief, rolle), pfad, rolle, runde, modell, max_turns, budget)
+
+
+def rollen_parallel(brief: brief_modul.Brief, runde: str, modell: str | None = None,
+                    budget: int = 420) -> list[AgentRun]:
+    """Strategie zuerst, dann Art Direction und Text gleichzeitig.
+
+    Die beiden hängen nur von `konzept.md` ab, nicht voneinander — sie können also
+    parallel laufen. Ein echter Auftrag braucht die Struktur vor der Gestaltung; alles
+    gleichzeitig laufen zu lassen hieße, dass der Text die Struktur raten muss.
+    """
+    from concurrent.futures import ThreadPoolExecutor
+
+    laeufe: list[AgentRun] = []
+    strategie = rolle_ausfuehren(brief, "strategie", runde, modell, budget=budget)
+    laeufe.append(strategie)
+    if not strategie.ok and not (brief_modul.runde_pfad(brief, runde) / "konzept.md").exists():
+        return laeufe
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        aufgaben = {rolle: pool.submit(rolle_ausfuehren, brief, rolle, runde, modell,
+                                       budget) for rolle in ("art", "text")}
+        for rolle in ("art", "text"):
+            laeufe.append(aufgaben[rolle].result())
+    return laeufe
+
+
+def bauprompt_nach_rollen(brief: brief_modul.Brief, runde: str) -> str:
+    return f"""Du bist die Bau-Rolle eines Designstudios. Auftrag:
+
+{_briefkopf(brief)}
+
+Im Ordner liegen bereits die Ergebnisse der anderen Rollen:
+  - `konzept.md` — Struktur und Tonalität (verbindlich)
+  - `design/tokens.css` — die Farben, Schriftgrößen und Abstände (verbindlich, nicht neu erfinden)
+  - `design/artdirection.md` — Schrift, Raster, drei Regeln
+  - `inhalte.md` — die Texte (Wortlaut übernehmen, nicht umschreiben)
+
+Baue daraus die Abgabe: die Seiten aus dem Briefing, `style.css`, und verweise auf
+`design/tokens.css`. Alle Regeln des Gates:
+
+{GATE_REGELN}
+  8. Keine Platzhalter. Keine eckigen Klammern, kein „TODO", keine Musteradresse.
+     Fehlt eine Angabe, formuliere ohne sie oder lass den Abschnitt weg — erfunden wird
+     nichts: keine Adresse, keine Öffnungszeit, kein Preis, keine Referenz.
+  9. Lege ZUERST NOTIZ.md an (fünf Zeilen) und ergänze sie am Ende.
+
+Nimm die Tokens wörtlich. Wenn dir eine Farbe fehlt, ergänze sie in `style.css`, aber
+ändere keine vorhandene. {ABSCHLUSS}
+"""
+
+
 # ---------------------------------------------------------------- Runden
 
 def baue(brief: brief_modul.Brief, runde: str, modell: str | None = None,
@@ -232,7 +376,7 @@ def kritik(brief: brief_modul.Brief, ergebnis: qa.Ergebnis,
 
 def automatik(brief: brief_modul.Brief, max_runden: int = config.MIN_ROUNDS + 1,
               modell: str | None = None, budget: int = BUDGET_SEKUNDEN,
-              protokoll=None) -> list[AgentRun]:
+              protokoll=None, rollen: bool = True) -> list[AgentRun]:
     """Bauen, messen, revidieren — bis das Gate grün ist oder die Runden ausgehen.
 
     `protokoll(run, ergebnis)` wird nach jedem Schritt aufgerufen; CLI und Web hängen daran
@@ -241,12 +385,24 @@ def automatik(brief: brief_modul.Brief, max_runden: int = config.MIN_ROUNDS + 1,
     from . import engine  # spät, damit agents nicht von engine abhängt
 
     laeufe: list[AgentRun] = []
+    # Rollen nur beim ersten Aufbau eines Auftrags — danach ist jede Runde eine Revision.
+    frisch = not brief_modul.runden(brief)
     runde = brief_modul.naechste_runde(brief)
     ergebnis: qa.Ergebnis | None = None
 
     for nummer in range(max_runden):
-        run = baue(brief, runde, modell, budget=budget,
-                   findings=[f.as_dict() for f in ergebnis.findings] if ergebnis else None)
+        if rollen and nummer == 0 and frisch:
+            # Erste Runde: Rolls, dann Bau — Revisionen laufen als ein Durchgang.
+            for teil in rollen_parallel(brief, runde, modell, budget):
+                laeufe.append(teil)
+                if protokoll:
+                    protokoll(teil, None)
+            run = lauf(bauprompt_nach_rollen(brief, runde),
+                       brief_modul.runde_pfad(brief, runde), "bau", runde, modell,
+                       MAX_TURNS, budget)
+        else:
+            run = baue(brief, runde, modell, budget=budget,
+                       findings=[f.as_dict() for f in ergebnis.findings] if ergebnis else None)
         laeufe.append(run)
         pfad = brief_modul.runde_pfad(brief, runde)
         if not run.ok and not (pfad.exists() and any(pfad.iterdir())):

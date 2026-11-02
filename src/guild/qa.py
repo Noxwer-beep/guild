@@ -18,6 +18,16 @@ KRITISCH, WARNUNG, INFO = "critical", "warn", "info"
 GEWICHT = {KRITISCH: 12, WARNUNG: 3, INFO: 1}
 
 TITEL_MIN, TITEL_MAX = 20, 70
+
+#: Text, der in einer Abgabe nichts zu suchen hat: ungefüllte Klammern, Lorem, Todos.
+PLATZHALTER = re.compile(
+    r"\[[^\]\n]{2,60}\]"          # [Straße und Hausnummer]
+    r"|\{\{[^}]{1,40}\}\}"          # {{ name }}
+    r"|\blorem ipsum\b"
+    r"|\bTODO\b|\bTBD\b|\bXXX\b"
+    r"|\bPlatzhalter\b"
+    r"|Musterstra(ss|ß)e",
+    re.I)
 BESCHREIBUNG_MIN, BESCHREIBUNG_MAX = 50, 165
 
 
@@ -316,6 +326,14 @@ def pruefe_seite(wurzel: Path, seite: Path) -> list[Finding]:
         f("inline", INFO, "Code", f"{sammler.styles_inline} style-Attribute",
           "Mehr als zwölf heißt: das Stylesheet deckt die Komponenten nicht ab.")
 
+    treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(text)
+                      if not m.group(0).startswith("[[")})
+    if treffer:
+        f("platzhalter", KRITISCH, "Inhalt",
+          f"{len(treffer)} Platzhalter im Text",
+          "Ungefüllt: " + ", ".join(treffer[:4]) +
+          " — fehlende Kundendaten gehören ins Briefing (fakten), nicht in die Seite.")
+
     groesse = len(text.encode())
     if groesse > config.MAX_HTML:
         f("groesse", WARNUNG, "Gewicht", f"HTML {groesse // 1024} KB",
@@ -329,6 +347,14 @@ def pruefe_css(wurzel: Path, datei: Path) -> list[Finding]:
     findings = kontraste(text)
     for finding in findings:
         finding.file = rel
+    treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(text)
+                      if not m.group(0).startswith("[[")})
+    if treffer:
+        f("platzhalter", KRITISCH, "Inhalt",
+          f"{len(treffer)} Platzhalter im Text",
+          "Ungefüllt: " + ", ".join(treffer[:4]) +
+          " — fehlende Kundendaten gehören ins Briefing (fakten), nicht in die Seite.")
+
     groesse = len(text.encode())
     if groesse > config.MAX_CSS:
         findings.append(Finding("css-groesse", WARNUNG, "Gewicht", f"CSS {groesse // 1024} KB",

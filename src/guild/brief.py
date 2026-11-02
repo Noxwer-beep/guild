@@ -34,6 +34,7 @@ class Brief:
     sprache: str = "de"
     einschraenkungen: list[str] = field(default_factory=list)
     referenzen: list[str] = field(default_factory=list)
+    fakten: list[str] = field(default_factory=list)
     abgabe: str = "statische Seite, kein Framework, kein Build-Schritt"
 
     def as_dict(self) -> dict:
@@ -68,6 +69,7 @@ def to_toml(brief: Brief) -> str:
         f'sprache = "{brief.sprache}"',
         liste("einschraenkungen", brief.einschraenkungen),
         liste("referenzen", brief.referenzen),
+        liste("fakten", brief.fakten),
         f'abgabe = "{_sauber(brief.abgabe)}"',
         "",
     ]
