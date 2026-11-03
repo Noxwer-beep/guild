@@ -151,6 +151,26 @@ class Gate(Basis):
         self.assertFalse(ergebnis.bestanden)
         self.assertTrue(any(f.key.startswith("bild-fehlt") for f in ergebnis.findings))
 
+    def test_das_wort_platzhalter_ist_kein_fehler(self) -> None:
+        self.brief()
+        wurzel = fixtures.baue(config.CLIENTS / "nordlicht" / "runden" / "v1")
+        seite = wurzel / "index.html"
+        seite.write_text(seite.read_text().replace(
+            "<p>Noch ein Absatz.</p>",
+            "<p>Der Platzhalter im Feld zeigt das erwartete Format.</p>"))
+        ergebnis = qa.pruefe_runde(wurzel, "v1")
+        self.assertNotIn("platzhalter", [f.key for f in ergebnis.findings])
+
+    def test_css_selektor_ist_kein_platzhalter(self) -> None:
+        self.brief()
+        wurzel = fixtures.baue(config.CLIENTS / "nordlicht" / "runden" / "v1")
+        seite = wurzel / "index.html"
+        seite.write_text(seite.read_text().replace(
+            "</head>",
+            '<style>[data-wert="abstand"] { --x: 1; }</style></head>'))
+        ergebnis = qa.pruefe_runde(wurzel, "v1")
+        self.assertNotIn("platzhalter", [f.key for f in ergebnis.findings])
+
     def test_leere_runde_ist_ein_fehler(self) -> None:
         self.brief()
         leer = config.CLIENTS / "nordlicht" / "runden" / "v1"

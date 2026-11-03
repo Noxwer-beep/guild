@@ -133,6 +133,29 @@ def cmd_build(args: argparse.Namespace) -> int:
     return 3
 
 
+def cmd_revise(args: argparse.Namespace) -> int:
+    """Nächste Runde aus der Kritik bauen."""
+    try:
+        brief = brief_modul.load_slug(args.slug)
+    except brief_modul.BriefError as exc:
+        ui.fail(str(exc))
+        return 2
+    ergebnis = agents.revidiere(brief, args.modell or None, args.budget)
+    if ergebnis is None:
+        ui.fail("keine Kritik gefunden — erst `guild build` laufen lassen")
+        return 3
+    runde, run = ergebnis
+    store = Store()
+    store.save_run(brief.slug, run)
+    gemessen = engine.messen(brief, runde, store)
+    marke = "✓" if run.ok else "⚑"
+    ui.console.print(f"  {marke} revision {runde:<4} {run.dauer_ms / 1000:5.1f}s  "
+                     f"{run.tokens / 1000:>6.0f}k Tokens  · Gate {gemessen.score}/100 "
+                     f"({gemessen.kritisch} kritisch)")
+    ui.findings([f.as_dict() for f in gemessen.findings], limit=8)
+    return 0 if gemessen.bestanden else 3
+
+
 def cmd_show(args: argparse.Namespace) -> int:
     try:
         brief = brief_modul.load_slug(args.slug)
@@ -263,6 +286,12 @@ def build_parser() -> argparse.ArgumentParser:
     build.add_argument("--klassisch", action="store_true",
                        help="alle Rollen in einem Durchgang statt parallel")
     build.set_defaults(func=cmd_build)
+
+    revise = sub.add_parser("revise", help="Kritik abarbeiten, nächste Runde")
+    revise.add_argument("slug")
+    revise.add_argument("--modell", default="")
+    revise.add_argument("--budget", type=int, default=420)
+    revise.set_defaults(func=cmd_revise)
 
     show = sub.add_parser("show", help="Stand eines Auftrags")
     show.add_argument("slug")

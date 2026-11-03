@@ -33,6 +33,7 @@ guild                       Übersicht aller Aufträge
 guild new <slug> …          Briefing anlegen
 guild run <slug> [runde]    Runde durch das Gate schicken
 guild show <slug>           Stand, Findings, Verlauf
+guild revise <slug>         Kritik abarbeiten, nächste Runde
 guild compare <slug> v1 v2  zwei Runden vergleichen
 guild ship <slug>           abgeben (nur bei grünem Gate)
 guild build <slug>          Runden von Hermes-Agenten bauen lassen
@@ -129,6 +130,14 @@ Modell und Anbieter. `guild show <slug>` und das Studio zeigen die Summe pro Auf
 nur auf deinen Aufruf, ein Lauf ist auf Züge und Zeit begrenzt, und ohne grünes Gate gibt es
 keine Abgabe. Ein gekappter Lauf (⚑) ist kein Fehler — wenn dabei eine abgabefähige Runde
 entstanden ist, wird sie gemessen und darf weiter.
+
+**Kritik ist eine eigene Rolle.** Ist das Gate schon grün, baut `guild build` nicht neu,
+sondern schickt die Kritik los: sie liest die Runde im Browser, prüft die Behauptungen
+gegen die Umsetzung und schreibt `kritik.md`. `guild revise` arbeitet die Kritik dann in
+einer neuen Runde ab. Beim ersten echten Auftrag hat genau das einen Fehler gefunden, den
+das Gate nicht sehen kann: die Hero-Zeile behauptete, das Raster *der Seite* reagiere —
+die Regler bewegten aber nur den Beispielkasten. Die Revision hat nicht die Funktion
+erfunden, sondern den Satz ehrlich gemacht.
 
 **Der Unterschied zum Gate.** Der Agent gestaltet, das Gate urteilt. Beim ersten echten Lauf
 lag v1 bei 99/100 und das einzige Finding war die fehlende Notiz — die Seite war gut, die

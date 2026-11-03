@@ -25,7 +25,6 @@ PLATZHALTER = re.compile(
     r"|\{\{[^}]{1,40}\}\}"          # {{ name }}
     r"|\blorem ipsum\b"
     r"|\bTODO\b|\bTBD\b|\bXXX\b"
-    r"|\bPlatzhalter\b"
     r"|Musterstra(ss|ß)e",
     re.I)
 BESCHREIBUNG_MIN, BESCHREIBUNG_MAX = 50, 165
@@ -103,6 +102,8 @@ class _Sammler(HTMLParser):
         self.styles_inline = 0
         self.links: list[str] = []
         self.skripte_href: list[str] = []
+        self.text: list[str] = []
+        self._stumm = 0
 
     def handle_starttag(self, tag: str, attrs: list[tuple[str, str | None]]) -> None:
         werte = dict(attrs)
@@ -126,7 +127,9 @@ class _Sammler(HTMLParser):
                 self.links.append(href)
                 if re.match(r"^https?://", href):
                     self.extern.append(href)
-        elif tag == "script":
+        elif tag in ("script", "style"):
+            self._stumm += 1
+        if tag == "script":
             src = (werte.get("src") or "").strip()
             if src:
                 self.skripte_href.append(src)
@@ -140,6 +143,8 @@ class _Sammler(HTMLParser):
             self.styles_inline += 1
 
     def handle_endtag(self, tag: str) -> None:
+        if tag in ("script", "style") and self._stumm:
+            self._stumm -= 1
         if tag == "title":
             self._im_titel = False
         elif tag in ("h1", "h2", "h3", "h4", "h5", "h6") and self._h_offen is not None:
@@ -149,6 +154,8 @@ class _Sammler(HTMLParser):
             self._h_text = []
 
     def handle_data(self, data: str) -> None:
+        if self._stumm == 0 and data.strip():
+            self.text.append(data.strip())
         if self._im_titel:
             self.titel += data
         if self._h_offen is not None:
@@ -345,8 +352,8 @@ def pruefe_seite(wurzel: Path, seite: Path) -> list[Finding]:
             f(f"bild-klein:{quelle[:30]}", INFO, "Bilder", f"{quelle} wirkt leer",
               "Unter 6 KB ist meist ein Platzhalter oder ein Fehlschlag.")
 
-    treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(text)
-                      if not m.group(0).startswith("[[")})
+    sichtbar = " ".join(sammler.text)
+    treffer = sorted({m.group(0) for m in PLATZHALTER.finditer(sichtbar)})
     if treffer:
         f("platzhalter", KRITISCH, "Inhalt",
           f"{len(treffer)} Platzhalter im Text",

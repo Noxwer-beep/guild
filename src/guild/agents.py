@@ -203,7 +203,9 @@ QUALITÄT
 def kriktikprompt(brief: brief_modul.Brief, ergebnis: qa.Ergebnis, runde: str) -> str:
     findings = "\n".join(f'  - [{f.severity}] {f.area}: {f.title} — {f.detail}'
                          for f in ergebnis.findings) or "  - keine"
-    return f"""Du bist die Kritik-Rolle im Studio. Der Auftrag ist {brief.kunde}
+    return f"""Du bist die Kritik-Rolle im Studio. Arbeite sparsam: lies höchstens vier
+Dateien (index.html, style.css, konzept.md, inhalte.md), nicht den ganzen Ordner — und
+schreibe `kritik.md` ZUERST mit dem, was du bis dahin siehst, dann ergänze sie. Der Auftrag ist {brief.kunde}
 ({brief.produkt}), Zielgruppe: {brief.zielgruppe}. Die Runde {runde} wurde mechanisch
 gemessen:
 
@@ -255,8 +257,9 @@ def lauf(prompt: str, cwd: Path, rolle: str, runde: str,
                         fehler="hermes nicht im PATH")
 
     cwd.mkdir(parents=True, exist_ok=True)
-    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False,
-                                     dir=str(cwd)) as datei:
+    # Promptdatei außerhalb des Rundenordners: sonst landet sie im Artefakt und wird
+    # bei der nächsten Revision mitkopiert.
+    with tempfile.NamedTemporaryFile("w", suffix=".txt", delete=False) as datei:
         datei.write(prompt)
         prompt_datei = Path(datei.name)
 
@@ -371,7 +374,52 @@ def kritik(brief: brief_modul.Brief, ergebnis: qa.Ergebnis,
            modell: str | None = None) -> AgentRun:
     pfad = brief_modul.runde_pfad(brief, ergebnis.runde)
     return lauf(kriktikprompt(brief, ergebnis, ergebnis.runde), pfad, "kritik",
-                ergebnis.runde, modell, max_turns=18, budget=600)
+                ergebnis.runde, modell, max_turns=30, budget=600)
+
+
+def revisionsprompt(brief: brief_modul.Brief, runde: str, kritik_text: str) -> str:
+    return f"""Du bist die Revisions-Rolle eines Designstudios. Auftrag:
+
+{_briefkopf(brief)}
+
+Im Ordner liegt `kritik.md` — eine Prüfung der vorigen Runde:
+
+{kritik_text[:4000]}
+
+Arbeite die Kritik ab. Reihenfolge:
+  1. Alles, was dort als Widerspruch zum Briefing oder als falsche Behauptung steht —
+     entweder die Umsetzung reparieren oder den Satz ehrlich machen. Eine Behauptung,
+     die nicht stimmt, ist schlimmer als eine fehlende Funktion.
+  2. Die Punkte aus „Was das Gate nicht sieht", soweit sie den Kern treffen.
+  3. Nichts verschlechtern, was dort unter „Was trägt" steht.
+
+Regeln des Gates gelten weiter:
+{GATE_REGELN}
+  8. Keine Platzhalter, nichts erfinden.
+  9. Ergänze NOTIZ.md um die Änderungen dieser Runde (was, warum).
+
+{ABSCHLUSS}
+"""
+
+
+def revidiere(brief: brief_modul.Brief, modell: str | None = None,
+              budget: int = 420) -> tuple[str, AgentRun] | None:
+    """Nächste Runde als Kopie bauen und die Kritik abarbeiten."""
+    import shutil
+
+    vorherige = brief_modul.runden(brief)
+    if not vorherige:
+        return None
+    quelle = brief_modul.runde_pfad(brief, vorherige[-1])
+    kritik_datei = quelle / "kritik.md"
+    neu = brief_modul.naechste_runde(brief)
+    ziel = brief_modul.runde_pfad(brief, neu)
+    shutil.copytree(quelle, ziel)
+    if not kritik_datei.exists():
+        return None
+    run = lauf(revisionsprompt(brief, neu, kritik_datei.read_text()), ziel, "revision", neu,
+               modell, MAX_TURNS, budget)
+    return neu, run
 
 
 def automatik(brief: brief_modul.Brief, max_runden: int = config.MIN_ROUNDS + 1,
@@ -384,7 +432,17 @@ def automatik(brief: brief_modul.Brief, max_runden: int = config.MIN_ROUNDS + 1,
     """
     from . import engine  # spät, damit agents nicht von engine abhängt
 
+    from . import engine as _engine
+
     laeufe: list[AgentRun] = []
+    # Schon grün? Dann ist die nächste sinnvolle Handlung eine Kritik, kein Neubau.
+    vorher = _engine.stand(brief)
+    if vorher.ergebnis and vorher.ergebnis.bestanden:
+        run = kritik(brief, vorher.ergebnis, modell)
+        if protokoll:
+            protokoll(run, vorher.ergebnis)
+        return [run]
+
     # Rollen nur beim ersten Aufbau eines Auftrags — danach ist jede Runde eine Revision.
     frisch = not brief_modul.runden(brief)
     runde = brief_modul.naechste_runde(brief)
@@ -413,7 +471,13 @@ def automatik(brief: brief_modul.Brief, max_runden: int = config.MIN_ROUNDS + 1,
         ergebnis = engine.messen(brief, runde)
         if protokoll:
             protokoll(run, ergebnis)
-        if ergebnis.bestanden and len(brief_modul.runden(brief)) >= config.MIN_ROUNDS:
+        if ergebnis.bestanden:
+            # Grün beim ersten Wurf: dann ist die zweite Runde eine Kritik, kein Neubau.
+            if len(brief_modul.runden(brief)) < config.MIN_ROUNDS:
+                kritik_run = kritik(brief, ergebnis, modell)
+                laeufe.append(kritik_run)
+                if protokoll:
+                    protokoll(kritik_run, ergebnis)
             break
         if nummer + 1 >= max_runden:
             break

@@ -61,13 +61,16 @@ def stand(brief: brief_modul.Brief, store: Store | None = None) -> Stand:
             ergebnis.findings = [qa.Finding(**f) for f in
                                  __import__("json").loads(gespeichert["qa"])["findings"]]
 
+    hat_kritik = bool(letzte and (brief_modul.runde_pfad(brief, letzte) / "kritik.md").exists())
     if not vorhanden:
         bereit, grund = False, "noch keine Runde gebaut"
-    elif len(vorhanden) < config.MIN_ROUNDS:
+    elif len(vorhanden) < config.MIN_ROUNDS and not hat_kritik:
         bereit, grund = False, f"erst {len(vorhanden)} Runde(n) — mindestens " \
-                               f"{config.MIN_ROUNDS} mit Revision"
+                               f"{config.MIN_ROUNDS} mit Revision, oder eine Runde mit Kritik"
     elif ergebnis is None or not ergebnis.bestanden:
         bereit, grund = False, "das Gate ist rot"
+    elif hat_kritik and len(vorhanden) < config.MIN_ROUNDS:
+        bereit, grund = True, "Gate grün, Kritik gelesen"
     else:
         bereit, grund = True, "Gate grün, Revision vorhanden"
 
@@ -109,6 +112,20 @@ def vergleiche(brief: brief_modul.Brief, a: str, b: str, store: Store | None = N
     }
 
 
+def beste_runde(brief: brief_modul.Brief, store: Store) -> str | None:
+    """Die höchste gemessene Runde, die das Gate bestanden hat.
+
+    Die letzte Runde ist nicht automatisch die beste: eine Revision kann verschlechtern.
+    Abgegeben wird, was am saubersten ist — nicht, was zuletzt geschrieben wurde.
+    """
+    kandidaten = []
+    for runde in brief_modul.runden(brief):
+        gespeichert = store.round(brief.slug, runde)
+        if gespeichert and gespeichert["bestanden"]:
+            kandidaten.append((gespeichert["score"], int(runde[1:]), runde))
+    return max(kandidaten)[2] if kandidaten else None
+
+
 def abgeben(brief: brief_modul.Brief, store: Store | None = None) -> Path:
     """Die letzte Runde freigeben — nur bei grünem Gate und vorhandener Revision."""
     store = store or Store()
@@ -116,7 +133,8 @@ def abgeben(brief: brief_modul.Brief, store: Store | None = None) -> Path:
     if not zustand.bereit:
         raise RuntimeError(f"keine Abgabe: {zustand.grund}")
 
-    quelle = brief_modul.runde_pfad(brief, zustand.letzte or "v1")
+    beste = beste_runde(brief, store) or zustand.letzte or "v1"
+    quelle = brief_modul.runde_pfad(brief, beste)
     ziel = brief.ordner / config.ABGABE
     if ziel.exists():
         shutil.rmtree(ziel)
@@ -125,12 +143,12 @@ def abgeben(brief: brief_modul.Brief, store: Store | None = None) -> Path:
     ergebnis = zustand.ergebnis
     vermerk.write_text(
         f"# Abgabe — {brief.kunde}\n\n"
-        f"- Stand: {zustand.letzte}\n"
+        f"- Stand: {beste}\n"
         f"- Gate: {ergebnis.score}/100 · {ergebnis.kritisch} kritisch · "
         f"{ergebnis.warnungen} Warnungen\n"
         f"- Runden: {', '.join(zustand.runden)}\n\n"
         f"{brief.produkt}\n")
-    store.log(brief.slug, "ok", f"{zustand.letzte} abgegeben → {ziel}")
+    store.log(brief.slug, "ok", f"{beste} abgegeben → {ziel}")
     return ziel
 
 
