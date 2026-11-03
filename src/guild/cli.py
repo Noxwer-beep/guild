@@ -241,6 +241,45 @@ def cmd_plan(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_preview(args: argparse.Namespace) -> int:
+    """Die Abgabe als statische Seite ausliefern — zum Ansehen, nicht zum Betrieb."""
+    import functools
+    from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+
+    try:
+        brief = brief_modul.load_slug(args.slug)
+    except brief_modul.BriefError as exc:
+        ui.fail(str(exc))
+        return 2
+
+    quelle = brief.ordner / config.ABGABE
+    if not quelle.exists():
+        runden = brief_modul.runden(brief)
+        if not runden:
+            ui.fail("nichts zu zeigen — erst bauen oder abgeben")
+            return 3
+        quelle = brief_modul.runde_pfad(brief, runden[-1])
+        ui.warn(f"keine Abgabe, zeige {runden[-1]}")
+
+    class Handler(SimpleHTTPRequestHandler):
+        def end_headers(self) -> None:
+            self.send_header("Cache-Control", "no-store")
+            super().end_headers()
+
+        def log_message(self, *_args) -> None:   # leise
+            pass
+
+    handler = functools.partial(Handler, directory=str(quelle))
+    server = ThreadingHTTPServer((args.host, args.port), handler)
+    ui.ok(f"{brief.kunde}: http://{args.host}:{args.port}/")
+    ui.hint(f"aus {quelle} — Strg+C beendet")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        ui.hint("beendet")
+    return 0
+
+
 def cmd_web(args: argparse.Namespace) -> int:
     from .web.app import create_app
     app = create_app()
@@ -311,6 +350,12 @@ def build_parser() -> argparse.ArgumentParser:
     plan = sub.add_parser("plan", help="Rollenplan")
     plan.add_argument("slug")
     plan.set_defaults(func=cmd_plan)
+
+    preview = sub.add_parser("preview", help="Abgabe als Seite ausliefern")
+    preview.add_argument("slug")
+    preview.add_argument("--host", default="127.0.0.1")
+    preview.add_argument("--port", type=int, default=8090)
+    preview.set_defaults(func=cmd_preview)
 
     web = sub.add_parser("web", help="Studio im Browser")
     web.add_argument("--host", default="127.0.0.1")
